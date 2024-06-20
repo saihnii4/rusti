@@ -3,14 +3,15 @@
 mod cmd;
 
 use cmd::*;
-use std::{env, sync::{Arc, RwLock}};
+use std::{env, ops::Deref, sync::Arc};
 
 use serenity::{
     all::{
         standard::{
             macros::{command, group, hook},
             CommandResult, Configuration,
-        }, ClientBuilder, Message, Ready, StandardFramework,
+        },
+        ChannelId, ClientBuilder, GuildId, Message, MessageId, Ready, StandardFramework,
     },
     async_trait,
     prelude::*,
@@ -22,8 +23,10 @@ struct Handler;
 
 struct SnipeBucket;
 
+// intuitively the defunct message should get deallocated off the heap once its replaced by a
+// fresher message.
 impl TypeMapKey for SnipeBucket {
-    type Value = Arc<RwLock<HashMap<u32, Message>>>;
+    type Value = Arc<RwLock<HashMap<u64, Message>>>;
 }
 
 #[async_trait]
@@ -35,15 +38,30 @@ impl EventHandler for Handler {
 
         println!("{} said \"{}\"", msg.author.name, msg.content);
     }
-    
-    async fn message_delete(&self, ctx: Context, msg: Message) {
+
+    async fn message_delete(
+        &self,
+        ctx: Context,
+        ch: ChannelId,
+        msg: MessageId,
+        _server: Option<GuildId>,
+    ) {
         if ctx.cache.current_user().bot {
-            ()
+            return;
         }
 
-        let mut wacc = ctx.data.write().await;
-        let mut snipe_acc =  wacc.get::<SnipeBucket>().expect("owo").clone();
-        snipe_acc
+        let snipe_lock = {
+            let data_read = ctx.data.read().await;
+            data_read.get::<SnipeBucket>().expect("bruh").clone()
+        };
+
+        {
+            let mut bucket = snipe_lock.write().await;
+            bucket
+                .entry(ch.into())
+                .or_insert(ctx.cache.message(ch, msg).unwrap().deref().clone());
+            // perhaps not too costly? idk
+        }
     }
 
     async fn ready(&self, ctx: Context, _: Ready) {

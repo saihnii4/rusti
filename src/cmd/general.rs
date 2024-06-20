@@ -6,6 +6,8 @@ use serenity::all::{
     Context, Message,
 };
 
+use crate::SnipeBucket;
+
 #[group]
 #[commands(ping)]
 pub struct General;
@@ -24,5 +26,23 @@ async fn uptime(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
+    Ok(())
+}
+
+#[command]
+async fn snipe(ctx: &Context, msg: &Message) -> CommandResult {
+    let lock = {
+        let data_access = ctx.data.read().await;
+        data_access.get::<SnipeBucket>().expect("hai").clone()
+    };
+    let last_snipe = {
+        let map = lock.read().await;
+        map.get(&msg.channel_id.into())
+    };
+    msg.reply(
+        ctx,
+    )
+    .await
+    .unwrap();
     Ok(())
 }

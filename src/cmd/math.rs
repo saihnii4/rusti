@@ -11,5 +11,5 @@ struct Math;
 
 #[command]
 async fn add(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.content
+    Ok(())
 }
